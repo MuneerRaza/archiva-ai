@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health
+from app.api.routes import auth, health
 from app.config import settings
 from app.database import close_pool, create_pool
 from app.exceptions import ArchivaError
@@ -85,3 +85,4 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 # --- Routes ---
 app.include_router(health.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
