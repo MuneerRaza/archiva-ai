@@ -1,41 +1,29 @@
 """Auto-provision profile, organization, and default workspace for new users."""
 
+import json
+
 import asyncpg
 
 from app.logging import get_logger
 from app.models.auth import AuthUser
+from app.models.workspace import WorkspaceSettingsModel
 
 logger = get_logger(__name__)
 
-DEFAULT_WORKSPACE_SETTINGS = """{
-    "ingestion": {
-        "auto_ingest": true,
-        "summary_generation": true,
-        "structure_extraction": true,
-        "table_extraction": true,
-        "transcription": false,
-        "image_description": false,
-        "video_description": false,
-        "processing_llm": {"provider": "ollama", "model": "qwen2.5:14b"},
-        "language": "en",
-        "reprocess_on_update": true
-    },
-    "agent": {
-        "llm_provider": "ollama",
-        "llm_model": "qwen2.5:14b",
-        "custom_instructions": "",
-        "language": "en"
-    }
-}"""
+DEFAULT_WORKSPACE_SETTINGS = json.dumps(
+    WorkspaceSettingsModel().model_dump(),
+)
 
 
-async def ensure_user_provisioned(conn: asyncpg.Connection, user: AuthUser) -> str:
-    """Ensure user has a profile, org, and workspace. Returns the workspace ID.
+async def ensure_user_provisioned(
+    conn: asyncpg.Connection, user: AuthUser,
+) -> tuple[str, str | None]:
+    """Ensure user has a profile, org, and workspace.
 
-    Idempotent — safe to call on every request (checks first, creates if missing).
+    Returns (workspace_id, full_name). Idempotent — safe to call on every request.
     """
     profile = await conn.fetchrow(
-        "SELECT id FROM profiles WHERE id = $1", user.id
+        "SELECT id, full_name FROM profiles WHERE id = $1", user.id
     )
 
     if profile is not None:
@@ -49,16 +37,18 @@ async def ensure_user_provisioned(conn: asyncpg.Connection, user: AuthUser) -> s
             """,
             user.id,
         )
-        return str(workspace["id"]) if workspace else ""
+        ws_id = str(workspace["id"]) if workspace else ""
+        return ws_id, profile["full_name"]
 
     # New user — provision everything in a transaction
     logger.info("provisioning_new_user", user_id=user.id, email=user.email)
+    full_name = user.email.split("@")[0]
 
     async with conn.transaction():
         await conn.execute(
             "INSERT INTO profiles (id, full_name) VALUES ($1, $2)",
             user.id,
-            user.email.split("@")[0],
+            full_name,
         )
 
         org_id = await conn.fetchval(
@@ -67,7 +57,7 @@ async def ensure_user_provisioned(conn: asyncpg.Connection, user: AuthUser) -> s
             VALUES ($1, $2)
             RETURNING id
             """,
-            f"{user.email.split('@')[0]}'s Org",
+            f"{full_name}'s Org",
             user.id,
         )
 
@@ -89,4 +79,4 @@ async def ensure_user_provisioned(conn: asyncpg.Connection, user: AuthUser) -> s
         org_id=str(org_id),
         workspace_id=str(workspace_id),
     )
-    return str(workspace_id)
+    return str(workspace_id), full_name

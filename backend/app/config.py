@@ -18,10 +18,18 @@ class LogLevel(StrEnum):
     ERROR = "error"
 
 
+class StorageBackendType(StrEnum):
+    LOCAL = "local"
+    R2 = "r2"
+
+
 class AppConfig(BaseModel):
     env: Environment = Environment.DEVELOPMENT
     debug: bool = True
     log_level: LogLevel = LogLevel.DEBUG
+    log_file: str | None = None
+    storage_backend: StorageBackendType = StorageBackendType.LOCAL
+    local_storage_path: str = "storage"
 
     @property
     def is_production(self) -> bool:
@@ -37,7 +45,7 @@ class BackendConfig(BaseModel):
 class DatabaseConfig(BaseModel):
     url: str = "postgresql://postgres:postgres@localhost:5432/postgres"
     pool_min: int = 2
-    pool_max: int = 10
+    pool_max: int = 20
 
 
 class SupabaseConfig(BaseModel):
@@ -63,7 +71,10 @@ class LLMConfig(BaseModel):
     @field_validator("ollama_base_url", "vllm_base_url")
     @classmethod
     def strip_trailing_slash(cls, v: str) -> str:
-        return v.rstrip("/")
+        v = v.rstrip("/")
+        if v.endswith("/v1"):
+            v = v[:-3]
+        return v
 
 
 class Settings(BaseSettings):

@@ -44,3 +44,10 @@ supabase/.temp/
 
 # Docker
 docker-compose.override.yml
+
+# Local storage
+backend/storage/
+
+# AI/session files
+.mcp.json
+GEMINI.md
