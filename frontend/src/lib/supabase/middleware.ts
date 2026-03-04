@@ -36,6 +36,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/" ||
     pathname === "/login" ||
     pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
     pathname.startsWith("/auth/");
 
   // Redirect unauthenticated users to login
@@ -45,12 +47,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from login/signup
-  if (user && (pathname === "/login" || pathname === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    return NextResponse.redirect(url);
-  }
+  // Don't force-redirect authenticated users away from login/signup.
+  // App entry routing is handled by the /app page, and forcing this redirect
+  // can create loops when bootstrap routing fails.
 
   return supabaseResponse;
 }

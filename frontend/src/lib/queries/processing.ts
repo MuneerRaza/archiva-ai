@@ -1,0 +1,71 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
+import type { DataResponse, ListResponse, ProcessingJob } from "@/types/models";
+
+export function useProcessingStatus(workspaceId: string, fileId: string) {
+  return useQuery({
+    queryKey: ["processing", workspaceId, fileId],
+    queryFn: () =>
+      api.get<DataResponse<ProcessingJob>>(
+        `/workspaces/${workspaceId}/files/${fileId}/processing`,
+      ),
+    select: (res) => res.data,
+    retry: false,
+  });
+}
+
+interface ReprocessParams {
+  fileId: string;
+  steps?: string[];
+}
+
+export function useReprocess(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fileId, steps }: ReprocessParams) =>
+      api.post<DataResponse<{ status: string; file_id: string }>>(
+        `/workspaces/${workspaceId}/files/${fileId}/reprocess`,
+        steps ? { steps } : undefined,
+      ),
+    onSuccess: (_data, { fileId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["processing", workspaceId, fileId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["file-detail", workspaceId, fileId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["browse", workspaceId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["processing-history", workspaceId],
+      });
+    },
+    onError: () => {
+      toast.error("Failed to start reprocessing");
+    },
+  });
+}
+
+export function useProcessingHistory(workspaceId: string) {
+  return useQuery({
+    queryKey: ["processing-history", workspaceId],
+    queryFn: () =>
+      api.get<ListResponse<ProcessingJob>>(
+        `/workspaces/${workspaceId}/processing/history?limit=100`,
+      ),
+    select: (res) => res.data,
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.data;
+      if (!jobs) return 5000;
+      const hasActive = jobs.some(
+        (j) => j.status === "queued" || j.status === "running",
+      );
+      return hasActive ? 3000 : false;
+    },
+  });
+}

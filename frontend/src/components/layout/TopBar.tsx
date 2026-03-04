@@ -2,8 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,30 +25,26 @@ export function TopBar({ title }: TopBarProps) {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border px-6">
+    <header className="flex h-14 items-center justify-between border-b border-[var(--overlay-6)] px-6">
       <div className="flex items-center gap-2">
         {title && (
-          <h1 className="text-sm font-medium text-foreground">{title}</h1>
+          <h1 className="text-[14px] font-medium text-foreground">{title}</h1>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs">U</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--overlay-8)] bg-[var(--overlay-3)] text-xs font-medium text-muted-foreground transition-colors hover:border-[var(--overlay-15)] hover:bg-[var(--overlay-6)] hover:text-foreground outline-none">
+            U
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={handleSignOut} className="text-[13px]">
+            <LogOut className="mr-2 h-3.5 w-3.5" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   );
 }

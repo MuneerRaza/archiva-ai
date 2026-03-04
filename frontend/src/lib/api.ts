@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim() ?? "";
+const API_ROOT = API_BASE ? `${API_BASE}/api` : "/api";
 
 interface ApiError {
   code: string;
@@ -36,11 +37,13 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${API_BASE}/api${path}`;
+  const url = `${API_ROOT}${path}`;
   const token = await getAccessToken();
 
+  const isFormData = options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -54,8 +57,24 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const body = (await response.json()) as ApiErrorResponse;
-    throw new ApiRequestError(response.status, body.error);
+    let errorPayload: ApiError;
+    try {
+      const body = await response.json();
+      if (body?.error?.message) {
+        errorPayload = body.error;
+      } else if (body?.detail) {
+        // FastAPI validation error format
+        const detail = typeof body.detail === "string"
+          ? body.detail
+          : JSON.stringify(body.detail);
+        errorPayload = { code: "validation_error", message: detail };
+      } else {
+        errorPayload = { code: "unknown", message: `Request failed (${response.status})` };
+      }
+    } catch {
+      errorPayload = { code: "unknown", message: `Request failed (${response.status})` };
+    }
+    throw new ApiRequestError(response.status, errorPayload);
   }
 
   if (response.status === 204) {
@@ -80,6 +99,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  delete: <T>(path: string) =>
-    request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: "DELETE",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+
+  upload: <T>(path: string, formData: FormData) =>
+    request<T>(path, {
+      method: "POST",
+      body: formData,
+    }),
 };
