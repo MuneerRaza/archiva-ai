@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 
 import structlog
 
@@ -17,11 +18,11 @@ def setup_logging() -> None:
     ]
 
     if settings.app.env == Environment.PRODUCTION:
-        # JSON output for production (machine-parseable)
         renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
     else:
-        # Pretty console output for development
         renderer = structlog.dev.ConsoleRenderer(colors=True)
+
+    log_file = _open_log_file(settings.app.log_file)
 
     structlog.configure(
         processors=[
@@ -33,9 +34,27 @@ def setup_logging() -> None:
             logging.getLevelName(settings.app.log_level.upper())
         ),
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        logger_factory=structlog.PrintLoggerFactory(file=log_file),
         cache_logger_on_first_use=True,
     )
+
+
+def _open_log_file(log_file: str | None) -> object:
+    """Return the file handle for logging output.
+
+    - None / "stdout" → sys.stdout
+    - "stderr" → sys.stderr
+    - Any path → opens (append mode) after creating parent dirs
+    """
+    if log_file is None or log_file.lower() == "stdout":
+        return sys.stdout
+
+    if log_file.lower() == "stderr":
+        return sys.stderr
+
+    path = Path(log_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path.open("a", encoding="utf-8")
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:

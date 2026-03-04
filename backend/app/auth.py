@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
-from jose import jwt, jwk
+from jose import jwk, jwt
 from jose.exceptions import JWTError
 
 from app.config import settings
@@ -33,10 +33,16 @@ class JWKSClient:
         if not self._is_expired and self._cache is not None:
             return self._cache
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(self._url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(self._url, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+            if self._cache is not None:
+                logger.warning("jwks_fetch_failed_using_stale_cache", error=str(exc))
+                return self._cache
+            raise
 
         self._cache = data
         self._expires_at = datetime.now() + timedelta(seconds=self._ttl_seconds)

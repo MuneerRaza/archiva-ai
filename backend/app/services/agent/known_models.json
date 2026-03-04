@@ -1,0 +1,53 @@
+{
+  "openai": {
+    "gpt-5.2": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5.2-pro": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5.2-codex": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5.1": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5-mini": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5-nano": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-5-pro": { "thinking": true, "thinking_budget": true, "vision": true },
+    "o4-mini": { "thinking": true, "thinking_budget": true, "vision": true },
+    "o3": { "thinking": true, "thinking_budget": true, "vision": true },
+    "o3-mini": { "thinking": true, "thinking_budget": true, "vision": false },
+    "o3-pro": { "thinking": true, "thinking_budget": true, "vision": true },
+    "o1": { "thinking": true, "thinking_budget": true, "vision": true },
+    "o1-pro": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gpt-4.1": { "thinking": false, "vision": true },
+    "gpt-4.1-mini": { "thinking": false, "vision": true },
+    "gpt-4.1-nano": { "thinking": false, "vision": true },
+    "gpt-4o": { "thinking": false, "vision": true },
+    "gpt-4o-mini": { "thinking": false, "vision": true },
+    "gpt-4-turbo": { "thinking": false, "vision": true }
+  },
+  "anthropic": {
+    "claude-opus-4-6": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-sonnet-4-6": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-haiku-4-5-20251001": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-haiku-4-5": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-sonnet-4-5-20250929": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-sonnet-4-5": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-5-20251101": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-5": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-1-20250805": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-1": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-sonnet-4-20250514": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-sonnet-4-0": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-20250514": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-opus-4-0": { "thinking": true, "thinking_budget": true, "vision": true },
+    "claude-3-haiku-20240307": { "thinking": false, "vision": true }
+  },
+  "gemini": {
+    "gemini-3.1-pro-preview": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gemini-3-flash-preview": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gemini-2.5-pro": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gemini-2.5-flash": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gemini-2.5-flash-lite": { "thinking": true, "thinking_budget": true, "vision": true },
+    "gemini-2.0-flash": { "thinking": false, "vision": true },
+    "gemini-2.0-flash-lite": { "thinking": false, "vision": true }
+  },
+  "vllm": {
+    "Qwen/Qwen3-14B-AWQ": { "thinking": true, "thinking_budget": false, "vision": false }
+  }
+}

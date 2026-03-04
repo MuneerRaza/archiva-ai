@@ -2,33 +2,58 @@ import time
 import uuid
 
 import structlog
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Attach a unique request ID to every request for end-to-end tracing."""
+class RequestIDMiddleware:
+    """Attach a unique request ID to every request for end-to-end tracing.
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        request.state.request_id = request_id
+    Pure ASGI middleware — avoids Starlette BaseHTTPMiddleware issues
+    with shutdown and task group cancellation.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        request_id = headers.get(b"x-request-id", b"").decode() or str(uuid.uuid4())
+
+        scope.setdefault("state", {})
+        scope["state"]["request_id"] = request_id
 
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        status_code = 500
 
-        response.headers["X-Request-ID"] = request_id
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                response_headers = list(message.get("headers", []))
+                response_headers.append((b"x-request-id", request_id.encode()))
+                message = {**message, "headers": response_headers}
+            await send(message)
 
-        structlog.get_logger().info(
-            "request_completed",
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-            duration_ms=duration_ms,
-        )
-
-        return response
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            if scope["type"] == "http":
+                duration_ms = round((time.perf_counter() - start) * 1000, 2)
+                path = scope.get("path", "")
+                method = scope.get("method", "")
+                # Strip query string to avoid logging sensitive tokens
+                path = path.split("?", 1)[0]
+                structlog.get_logger().info(
+                    "request_completed",
+                    method=method,
+                    path=path,
+                    status=status_code,
+                    duration_ms=duration_ms,
+                )

@@ -1,9 +1,13 @@
+import asyncio
+
 import asyncpg
 
 from app.config import settings
 from app.logging import get_logger
 
 logger = get_logger(__name__)
+
+POOL_CLOSE_TIMEOUT = 3.0
 
 _pool: asyncpg.Pool | None = None
 
@@ -24,6 +28,11 @@ async def create_pool() -> asyncpg.Pool:
         dsn=settings.database.url,
         min_size=settings.database.pool_min,
         max_size=settings.database.pool_max,
+        command_timeout=30,
+        # Recycle idle connections before Supabase drops them server-side.
+        # Supabase aggressively closes idle connections; keeping stale ones
+        # in the pool causes TimeoutError on first use after idle period.
+        max_inactive_connection_lifetime=120,
     )
 
     logger.info("database_pool_created")
@@ -31,12 +40,19 @@ async def create_pool() -> asyncpg.Pool:
 
 
 async def close_pool() -> None:
-    """Close the connection pool."""
+    """Close the connection pool gracefully, with a fallback to terminate."""
     global _pool
-    if _pool is not None:
-        await _pool.close()
-        _pool = None
-        logger.info("database_pool_closed")
+    if _pool is None:
+        return
+
+    try:
+        await asyncio.wait_for(_pool.close(), timeout=POOL_CLOSE_TIMEOUT)
+    except asyncio.TimeoutError:
+        logger.warning("pool_close_timeout", timeout=POOL_CLOSE_TIMEOUT)
+        _pool.terminate()
+
+    _pool = None
+    logger.info("database_pool_closed")
 
 
 def get_pool() -> asyncpg.Pool:
