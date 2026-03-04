@@ -3,6 +3,10 @@
 ## Project Overview
 AI-powered CMS where an agent reasons over organizational documents. See `PLAN.md` for full architecture and decisions.
 
+## Tooling
+- **Python package manager:** `uv` — always use `uv add` to install packages and `uv run` to execute Python commands
+- **Frontend package manager:** `pnpm`
+
 ## Tech Stack
 - **Backend:** FastAPI (Python 3.12+), asyncpg, Pydantic AI, Cloudflare R2
 - **Frontend:** Next.js 15 (App Router), TypeScript, shadcn/ui, Tailwind CSS, Zustand, TanStack Query

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archiva — Supabase Email Templates</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0b;
+            color: #e4e4e7;
+            padding: 2rem 1.5rem;
+            line-height: 1.6;
+        }
+        .container { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .subtitle { color: #71717a; font-size: 0.875rem; margin-bottom: 2rem; }
+        h2 { font-size: 1.125rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.5rem; }
+        .instructions { color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1rem; }
+        .template-block {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        .template-block pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.8125rem;
+            color: #a1a1aa;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #2563eb; }
+        .label { color: #71717a; font-size: 0.75rem; margin-bottom: 0.25rem; }
+        .field { margin-bottom: 1rem; }
+        .field code {
+            background: #27272a;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.8125rem;
+            color: #e4e4e7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Supabase Email Templates</h1>
+        <p class="subtitle">Copy-paste these into Supabase Dashboard → Authentication → Email Templates</p>
+
+        <!-- CONFIRM SIGNUP -->
+        <h2>1. Confirm Signup</h2>
+        <p class="instructions">Supabase Dashboard → Email Templates → "Confirm signup"</p>
+
+        <div class="field">
+            <p class="label">Subject:</p>
+            <code>Confirm your Archiva account</code>
+        </div>
+
+        <div class="template-block">
+            <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+            <pre id="confirm-signup">&lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0b;padding:40px 20px"&gt;
+  &lt;tr&gt;&lt;td align="center"&gt;
+    &lt;table width="480" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:12px;padding:40px 32px"&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:24px"&gt;
+        &lt;svg viewBox="0 0 32 32" fill="none" width="40" height="40"&gt;
+          &lt;rect x="6" y="8" width="14" height="14" rx="3" fill="#f97316" fill-opacity="0.6" transform="rotate(-15 13 15)"/&gt;
+          &lt;rect x="9" y="6" width="14" height="14" rx="3" fill="#a855f7" fill-opacity="0.5" transform="rotate(6 16 13)"/&gt;
+          &lt;rect x="12" y="10" width="14" height="14" rx="3" fill="#3b82f6" fill-opacity="0.6" transform="rotate(22 19 17)"/&gt;
+        &lt;/svg&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:20px;font-weight:600;color:#e4e4e7;padding-bottom:8px"&gt;
+        Confirm your email
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;color:#71717a;padding-bottom:28px"&gt;
+        Click the button below to verify your email and activate your Archiva account.
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:28px"&gt;
+        &lt;a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 32px;background:#3b82f6;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px"&gt;
+          Confirm email
+        &lt;/a&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#52525b"&gt;
+        If you didn't create an account, you can safely ignore this email.
+      &lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</pre>
+        </div>
+
+        <!-- RESET PASSWORD -->
+        <h2>2. Reset Password</h2>
+        <p class="instructions">Supabase Dashboard → Email Templates → "Reset password"</p>
+
+        <div class="field">
+            <p class="label">Subject:</p>
+            <code>Reset your Archiva password</code>
+        </div>
+
+        <div class="template-block">
+            <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+            <pre id="reset-password">&lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0b;padding:40px 20px"&gt;
+  &lt;tr&gt;&lt;td align="center"&gt;
+    &lt;table width="480" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:12px;padding:40px 32px"&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:24px"&gt;
+        &lt;svg viewBox="0 0 32 32" fill="none" width="40" height="40"&gt;
+          &lt;rect x="6" y="8" width="14" height="14" rx="3" fill="#f97316" fill-opacity="0.6" transform="rotate(-15 13 15)"/&gt;
+          &lt;rect x="9" y="6" width="14" height="14" rx="3" fill="#a855f7" fill-opacity="0.5" transform="rotate(6 16 13)"/&gt;
+          &lt;rect x="12" y="10" width="14" height="14" rx="3" fill="#3b82f6" fill-opacity="0.6" transform="rotate(22 19 17)"/&gt;
+        &lt;/svg&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:20px;font-weight:600;color:#e4e4e7;padding-bottom:8px"&gt;
+        Reset your password
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;color:#71717a;padding-bottom:28px"&gt;
+        Someone requested a password reset for your Archiva account. Click below to choose a new password.
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:28px"&gt;
+        &lt;a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 32px;background:#3b82f6;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px"&gt;
+          Reset password
+        &lt;/a&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#52525b"&gt;
+        If you didn't request this, you can safely ignore this email.
+      &lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</pre>
+        </div>
+
+        <!-- MAGIC LINK -->
+        <h2>3. Magic Link (optional)</h2>
+        <p class="instructions">Supabase Dashboard → Email Templates → "Magic link"</p>
+
+        <div class="field">
+            <p class="label">Subject:</p>
+            <code>Your Archiva sign-in link</code>
+        </div>
+
+        <div class="template-block">
+            <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+            <pre id="magic-link">&lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0b;padding:40px 20px"&gt;
+  &lt;tr&gt;&lt;td align="center"&gt;
+    &lt;table width="480" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:12px;padding:40px 32px"&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:24px"&gt;
+        &lt;svg viewBox="0 0 32 32" fill="none" width="40" height="40"&gt;
+          &lt;rect x="6" y="8" width="14" height="14" rx="3" fill="#f97316" fill-opacity="0.6" transform="rotate(-15 13 15)"/&gt;
+          &lt;rect x="9" y="6" width="14" height="14" rx="3" fill="#a855f7" fill-opacity="0.5" transform="rotate(6 16 13)"/&gt;
+          &lt;rect x="12" y="10" width="14" height="14" rx="3" fill="#3b82f6" fill-opacity="0.6" transform="rotate(22 19 17)"/&gt;
+        &lt;/svg&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:20px;font-weight:600;color:#e4e4e7;padding-bottom:8px"&gt;
+        Sign in to Archiva
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;color:#71717a;padding-bottom:28px"&gt;
+        Click the button below to sign in to your Archiva account.
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="padding-bottom:28px"&gt;
+        &lt;a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 32px;background:#3b82f6;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px"&gt;
+          Sign in
+        &lt;/a&gt;
+      &lt;/td&gt;&lt;/tr&gt;
+      &lt;tr&gt;&lt;td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#52525b"&gt;
+        If you didn't request this, you can safely ignore this email.
+      &lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</pre>
+        </div>
+    </div>
+
+    <script>
+        function copyTemplate(btn) {
+            const pre = btn.parentElement.querySelector('pre');
+            // Decode HTML entities to get raw HTML
+            const tmp = document.createElement('textarea');
+            tmp.innerHTML = pre.textContent;
+            navigator.clipboard.writeText(tmp.value);
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 1500);
+        }
+    </script>
+</body>
+</html>

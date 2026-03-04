@@ -225,10 +225,10 @@ Abstracted — connect to where users already have data:
 
 | Tool | Signature | Purpose |
 |---|---|---|
-| `browse` | `(folder_id="0", sort_by="recent"\|"name"\|"size", limit=30, offset=0)` | Navigate folder contents. ID-based. `"0"` = workspace root. |
-| `get_info` | `(file_ids=list[str], include=["summary","structure","metadata","tags"])` | File details: summaries, TOC/headings, metadata, tags. |
-| `search` | `(query=str, folder_id=str\|None, file_type="all"\|"pdf"\|"docx"\|..., limit=20, offset=0)` | Unified BM25 + auto-fuzzy. Backend handles matching strategy. |
-| `read` | `(file_id=str, sections=list[str]\|None, page_start=int\|None, page_end=int\|None, match=list[str]\|None, limit=5000, offset=0)` | Read content. Modes: full, by section, by page range, or find matching passages. One mode at a time. |
+| `browse` | `(folder_id="", sort_by="name"\|"size"\|"recent", limit=30, offset=0)` | Navigate folder contents. ID-based. `""` = workspace root. |
+| `get_info` | `(file_id=str, include="summary,structure,metadata,tags")` | File details: summaries, TOC/headings, metadata, tags. Comma-separated include filter. |
+| `search` | `(query=str, limit=20, offset=0)` | Unified BM25 + auto-fuzzy. Backend handles matching strategy. |
+| `read` | `(file_id=str, offset=0, match="")` | Read content (5000 chars/call). Use offset to paginate, or match to jump to a passage. |
 
 ### 7.2 V2 Tools (Future)
 
@@ -298,11 +298,12 @@ Middleware runs before each LLM call, checks token count:
 - **Drop:** raw tool results from old turns.
 
 ### 9.3 Tool Result Management
-- `read`: max 5000 chars/call. Paginate with offset.
+- All tools return **plain text strings** (not structured JSON). Pydantic AI wraps them as `{"output": "..."}` in SSE events.
+- `read`: max 5000 chars/call. Paginate with offset. Text hints like "[More content available. Use offset=...]" guide the LLM.
 - `search`: max 20 results with short snippets.
-- `get_info`: summaries are 2-3 lines, naturally small.
-- `browse`: max 30 items.
-- All results include `has_more` flag.
+- `get_info`: summaries are 2-3 lines, naturally small. Include filter reduces output.
+- `browse`: max 50 items (configurable via limit param).
+- Pagination hints embedded in text output (not structured `has_more` flags).
 
 ### 9.4 Session Management
 - **New session:** fresh system prompt + location context. No history.
@@ -604,9 +605,8 @@ MVP is single-user:
 - Global search trigger (opens search page or command palette)
 - User avatar + dropdown (profile, settings, logout)
 
-**Chat access — two modes:**
-1. **Full page** (`/app/[ws]/chat`) — dedicated chat view for deep conversations
-2. **Side panel** — toggleable from any page via button/shortcut. Slide-over from right. For quick questions while browsing files. Same full functionality, just narrower.
+**Chat access — slide-over panel only (no standalone page):**
+- **Side panel** — toggleable from any page via FAB button. Slide-over from right with fullscreen toggle. Context-aware: knows which file/folder the user is currently viewing. Supports full chat functionality including thinking display, tool call cards, message editing, branching, and retry.
 
 ### 12.4 Key Pages
 
@@ -1149,13 +1149,13 @@ Sequential — each phase builds on the previous.
 - `[2026-02-26] Workspace Model — Workspaces in v1. Org → Workspaces → Folders → Files. Fully isolated, no cross-workspace queries. workspace_id injected via session context, not a tool param.`
 - `[2026-02-26] System Prompt — Dynamic injection per turn. Location context (workspace/folder/file), counts not listings, rules, user preferences.`
 - `[2026-02-26] Context Offloading — Middleware before each LLM call. Keep: system prompt + last 10 messages + key facts. Compress older messages. Drop old tool results.`
-- `[2026-02-26] Tool Result Management — read: 5000 chars, search: 20 results, browse: 30 items, get_info: naturally small. All have has_more flag.`
+- `[2026-02-26] Tool Result Management — Tools return plain text strings (not structured JSON). read: 5000 chars, search: 20 results, browse: 50 items max, get_info: naturally small. Pagination hints embedded in text output.`
 - `[2026-02-26] Session Management — New: fresh. Continue: load all if fits, only compressed if previously compacted. All messages stored in DB.`
 - `[2026-02-26] Subagents — Deferred.`
 - `[2026-02-26] Artifacts — v2. ACT tools (publish_artifact) + TRIGGER tools (trigger_service).`
 - `[2026-02-26] Ingest Pipeline — Multi-step async processing. Auto-ingest default, manual mode available. Always-on: text extraction + BM25 + fuzzy (shown as info note, not toggles). Optional: summary, structure, tables, transcription, image/video description. DB-backed job queue, async worker in FastAPI process, 3 concurrent files. Retry 3x with backoff. Partial success allowed (optional steps can fail). Processing LLM can differ from agent LLM.`
 - `[2026-02-26] Auth — Supabase Auth. Email/password + magic link + Google OAuth. Auto-create org + workspace on signup. Single-user in MVP, schema ready for multi-tenant.`
-- `[2026-02-26] Frontend — Dark theme, Notion/Linear vibe. /app/[workspaceId]/... routes. Sidebar nav + topbar breadcrumbs. Chat: full page + slide-over panel. File browser: table view. Zustand + TanStack Query.`
+- `[2026-02-26] Frontend — Dark theme, Notion/Linear vibe. /app/[workspaceId]/... routes. Sidebar nav + topbar breadcrumbs. Chat: slide-over panel only (no standalone page), context-aware. File browser: table view. Zustand + TanStack Query.`
 - `[2026-02-26] Database Schema — Full schema designed: profiles, organizations, workspaces, folders, files, file_contents, file_tables, tags, file_tags, processing_jobs, agent_sessions, agent_messages. Indexes for BM25 (GIN tsvector), fuzzy (GIN pg_trgm), materialized paths.`
 - `[2026-02-26] Deployment — Local: Docker Compose + Supabase CLI. Production: Railway (backend) + Vercel (frontend) + Supabase cloud + R2. CI: GitHub Actions. Estimated $0-15/mo for MVP.`
 - `[2026-02-26] MVP Build Order — 5 phases, 27 steps: Foundation → File Management → Processing Pipeline → AI Agent → Search & Polish.`
