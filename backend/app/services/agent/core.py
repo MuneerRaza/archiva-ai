@@ -8,8 +8,14 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 
 import asyncpg
-from pydantic_ai import Agent, PartDeltaEvent, TextPartDelta, ThinkingPartDelta
-from pydantic_ai import FunctionToolCallEvent, FunctionToolResultEvent
+from pydantic_ai import Agent, FunctionToolCallEvent, FunctionToolResultEvent, PartDeltaEvent, PartStartEvent, TextPartDelta, ThinkingPartDelta
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ThinkingPart,
+    UserPromptPart,
+)
 
 from app.database import get_pool
 from app.logging import get_logger
@@ -107,13 +113,9 @@ def _build_message_history(history_rows: list) -> list[dict]:
     We build ModelRequest/ModelResponse objects from the DB rows.
     """
     from pydantic_ai.messages import (
-        ModelRequest,
-        ModelResponse,
         SystemPromptPart,
-        TextPart,
         ToolCallPart,
         ToolReturnPart,
-        UserPromptPart,
     )
 
     messages: list[ModelRequest | ModelResponse] = []
@@ -346,9 +348,11 @@ async def run_agent(
     remaining_tokens = context_length - used_tokens - 1000  # reserve for LLM response
     remaining_context_chars = max(remaining_tokens * 4, MIN_CONTEXT_CHARS)
 
-    # Build deps
+    # Build deps — tools get their own connections from the pool
+    # so parallel tool calls don't conflict on a single connection
+    pool = get_pool()
     deps = AgentDeps(
-        conn=conn,
+        pool=pool,
         workspace_id=workspace_id,
         user_id=user_id,
         remaining_context_chars=remaining_context_chars,
@@ -374,7 +378,24 @@ async def run_agent(
                 if Agent.is_model_request_node(node):
                     async with node.stream(run.ctx) as request_stream:
                         async for event in request_stream:
-                            if isinstance(event, PartDeltaEvent):
+                            # PartStartEvent fires when a new part is created
+                            # (e.g. TextPart after </think> tag closes ThinkingPart).
+                            # Its .part.content holds the first token — must not be dropped.
+                            if isinstance(event, PartStartEvent):
+                                if isinstance(event.part, TextPart) and event.part.content:
+                                    full_text += event.part.content
+                                    yield SSEEvent(
+                                        SSEEventType.TEXT_DELTA,
+                                        TextDeltaEvent(content=event.part.content).model_dump(),
+                                    )
+                                elif isinstance(event.part, ThinkingPart) and event.part.content:
+                                    full_thinking += event.part.content
+                                    yield SSEEvent(
+                                        SSEEventType.THINKING_DELTA,
+                                        ThinkingDeltaEvent(content=event.part.content).model_dump(),
+                                    )
+
+                            elif isinstance(event, PartDeltaEvent):
                                 if isinstance(event.delta, TextPartDelta):
                                     text = event.delta.content_delta
                                     if text:
@@ -456,7 +477,6 @@ async def run_agent(
 
         # Update session cache with new message history
         # Append user message + assistant response to cached history
-        from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
         updated_history = list(message_history)
         updated_history.append(ModelRequest(parts=[UserPromptPart(content=user_message)]))
         if full_text:

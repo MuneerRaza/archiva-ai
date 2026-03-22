@@ -15,6 +15,7 @@ import { RenameDialog } from "@/components/files/rename-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDragSelect } from "@/hooks/use-drag-select";
+import { useFolderUpload } from "@/hooks/use-folder-upload";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useBrowse } from "@/lib/queries/browse";
 import { useBulkDeleteFiles, useDeleteFile, useMoveFiles, useUploadFile } from "@/lib/queries/files";
@@ -101,6 +102,7 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
 
   const browseQuery = useBrowse(workspaceId, currentFolderId, sortBy, sortDir);
@@ -111,6 +113,7 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
   const deleteFile = useDeleteFile(workspaceId);
   const deleteFolder = useDeleteFolder(workspaceId);
   const moveFiles = useMoveFiles(workspaceId);
+  const folderUpload = useFolderUpload(workspaceId, currentFolderId);
   const rawFolders = browseQuery.data?.folders ?? [];
   const rawFiles = browseQuery.data?.files ?? [];
 
@@ -227,6 +230,10 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
     fileInputRef.current?.click();
   }
 
+  function handleUploadFolderClick() {
+    folderInputRef.current?.click();
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const fileList = e.target.files;
     if (!fileList) return;
@@ -234,6 +241,13 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
     for (const file of Array.from(fileList)) {
       uploadFile.mutate({ file, folderId: currentFolderId });
     }
+    e.target.value = "";
+  }
+
+  function handleFolderChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    folderUpload.mutate(Array.from(fileList));
     e.target.value = "";
   }
 
@@ -329,6 +343,7 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
         canGoBack={currentFolderId !== null}
         onCreateFolder={() => setCreateFolderOpen(true)}
         onUploadClick={handleUploadClick}
+        onUploadFolderClick={handleUploadFolderClick}
         onBulkDelete={handleBulkDeleteClick}
         onBulkReprocess={() => setBulkReprocessOpen(true)}
         selectionHasOnlyFiles={selectedIds.size > 0 && Array.from(selectedIds).every((id) => !folders.some((f) => f.id === id))}
@@ -354,6 +369,16 @@ export function FileBrowser({ workspaceId }: FileBrowserProps) {
         multiple
         className="hidden"
         onChange={handleFileChange}
+      />
+      <input
+        ref={(el) => {
+          (folderInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+          if (el) el.setAttribute("webkitdirectory", "");
+        }}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFolderChange}
       />
 
       {isLoading || !hydrated ? (

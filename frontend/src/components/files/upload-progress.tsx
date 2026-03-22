@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useIsMutating, useMutationState } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronRight, Loader2, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Square, Upload, X } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useProcessingHistory } from "@/lib/queries/processing";
+import { useUploadStore } from "@/stores/upload-store";
 
 interface UploadProgressProps {
   workspaceId: string;
@@ -17,9 +18,18 @@ type Phase = "uploading" | "processing" | "done" | "hidden";
 
 export function UploadProgress({ workspaceId }: UploadProgressProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const uploading = useIsMutating({ mutationKey: ["upload-file"] });
+  const uploadingFiles = useIsMutating({ mutationKey: ["upload-file"] });
+  const uploadingFolder = useIsMutating({ mutationKey: ["upload-folder"] });
+  const uploading = uploadingFiles + uploadingFolder;
   const { data: jobs } = useProcessingHistory(workspaceId);
+
+  // Folder upload store
+  const folderPhase = useUploadStore((s) => s.folderPhase);
+  const folderTotal = useUploadStore((s) => s.total);
+  const folderDone = useUploadStore((s) => s.done);
+  const folderFailed = useUploadStore((s) => s.failed);
+  const foldersTotal = useUploadStore((s) => s.foldersTotal);
+  const foldersDone = useUploadStore((s) => s.foldersDone);
 
   const activeJobs = jobs?.filter(
     (j) => j.status === "queued" || j.status === "running",
@@ -43,13 +53,10 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
   const hadActivityRef = useRef(false);
   const batchStartRef = useRef<number>(0);
 
-  const isOnActivityPage = pathname === `/app/${workspaceId}/activity`;
-
   // Track uploaded count — when uploading drops, count the difference
   useEffect(() => {
     const prev = prevUploadingRef.current;
     if (uploading > 0 && prev === 0) {
-      // Upload batch started — record timestamp to filter mutations
       batchStartRef.current = Date.now();
       setUploadedCount(0);
       setDismissed(false);
@@ -60,7 +67,6 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
       }
     }
     if (uploading > 0) {
-      // While uploading, track max seen
       setUploadedCount((c) => Math.max(c, uploading));
     }
     prevUploadingRef.current = uploading;
@@ -104,7 +110,7 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
     };
   }, []);
 
-  if (phase === "hidden" || dismissed || isOnActivityPage) return null;
+  if (phase === "hidden" || dismissed) return null;
 
   function handleClick() {
     router.push(`/app/${workspaceId}/activity`);
@@ -114,6 +120,15 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
     e.stopPropagation();
     setDismissed(true);
   }
+
+  function handleCancel(e: React.MouseEvent) {
+    e.stopPropagation();
+    useUploadStore.getState().cancelFolderUpload();
+  }
+
+  // Folder upload progress
+  const isFolderActive = folderPhase !== "idle" && folderPhase !== "done";
+  const folderProgress = folderTotal > 0 ? Math.round((folderDone / folderTotal) * 100) : 0;
 
   const avgProgress = activeJobs.length > 0
     ? Math.round(activeJobs.reduce((sum, j) => sum + (j.progress ?? 0), 0) / activeJobs.length)
@@ -138,9 +153,19 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
             <>
               <Upload className="h-4 w-4 shrink-0 text-blue-400" />
               <span className="flex-1 text-[13px] font-medium">
-                Uploading {uploading} file{uploading > 1 ? "s" : ""}...
-                {hasFailures && (
-                  <span className="text-red-400"> ({failedCount} failed)</span>
+                {isFolderActive && folderPhase === "creating-folders" ? (
+                  foldersTotal > 0
+                    ? `Creating folders ${foldersDone} / ${foldersTotal}...`
+                    : "Creating folders..."
+                ) : isFolderActive && folderPhase === "uploading" ? (
+                  <>Uploading {folderDone} / {folderTotal} files...</>
+                ) : uploadingFolder > 0 ? (
+                  `Uploading folder${uploadingFiles > 0 ? ` + ${uploadingFiles} file${uploadingFiles > 1 ? "s" : ""}` : ""}...`
+                ) : (
+                  `Uploading ${uploading} file${uploading > 1 ? "s" : ""}...`
+                )}
+                {(hasFailures || (isFolderActive && folderFailed > 0)) && (
+                  <span className="text-red-400"> ({isFolderActive ? folderFailed : failedCount} failed)</span>
                 )}
               </span>
             </>
@@ -174,25 +199,44 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
           )}
         </div>
 
-        {phase !== "done" && (
+        {phase === "uploading" && isFolderActive && folderPhase === "creating-folders" ? (
+          <Progress value={foldersTotal > 0 ? Math.round((foldersDone / foldersTotal) * 100) : undefined} className="mt-2 h-1" />
+        ) : phase === "uploading" && isFolderActive && folderPhase === "uploading" ? (
+          <Progress value={folderProgress} className="mt-2 h-1" />
+        ) : phase !== "done" ? (
           <Progress
             value={phase === "processing" ? avgProgress : undefined}
             className="mt-2 h-1"
           />
-        )}
+        ) : null}
 
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           {phase === "done" ? "Click to view logs" : "Click to view activity"}
         </p>
       </button>
 
-      <button
-        onClick={handleDismiss}
-        className="absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-[var(--overlay-6)] hover:text-muted-foreground"
-        aria-label="Dismiss"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
+      {/* Cancel button for active folder uploads */}
+      {phase === "uploading" && isFolderActive && (
+        <button
+          onClick={handleCancel}
+          className="absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+          aria-label="Cancel upload"
+          title="Cancel upload"
+        >
+          <Square className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      {/* Dismiss button (only when not showing cancel) */}
+      {!(phase === "uploading" && isFolderActive) && (
+        <button
+          onClick={handleDismiss}
+          className="absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-[var(--overlay-6)] hover:text-muted-foreground"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

@@ -81,6 +81,7 @@ class IngestionSettings(BaseModel):
     auto_ingest: bool = True
     reprocess_on_update: bool = True
     summary_model_id: str | None = None
+    overview_model_id: str | None = None
     vision_model_id: str | None = None
     transcription_model_id: str | None = None
     language: str = "en"

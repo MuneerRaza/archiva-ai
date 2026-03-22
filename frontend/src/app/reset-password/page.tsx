@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LogoIcon } from "@/components/logo";
 import { LoadingDots } from "@/components/ui/loading-dots";
@@ -17,6 +17,8 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Supabase handles the token exchange automatically when the user
   // clicks the email link — it sets the session via the URL hash fragment.
@@ -160,18 +162,28 @@ export default function ResetPasswordPage() {
                   >
                     New password
                   </label>
-                  <input
-                    id="password"
-                    type="password"
-                    placeholder="Min. 6 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    autoFocus
-                    className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
-                  />
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Min. 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      autoFocus
+                      className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -181,17 +193,27 @@ export default function ResetPasswordPage() {
                   >
                     Confirm password
                   </label>
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Re-enter password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
-                  />
+                  <div className="relative">
+                    <input
+                      id="confirm-password"
+                      type={showConfirm ? "text" : "password"}
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                      aria-label={showConfirm ? "Hide password" : "Show password"}
+                    >
+                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {error && (

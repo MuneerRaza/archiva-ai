@@ -36,6 +36,36 @@ class FolderRepository(BaseRepository):
             parent_id,
         )
 
+    async def find_by_name_and_parent(
+        self,
+        workspace_id: uuid.UUID,
+        name: str,
+        parent_id: uuid.UUID | None,
+    ) -> asyncpg.Record | None:
+        """Find a folder by name under a given parent (None = root)."""
+        if parent_id is None:
+            return await self._conn.fetchrow(
+                """
+                SELECT id, workspace_id, parent_id, name, path,
+                       created_at, updated_at
+                FROM folders
+                WHERE workspace_id = $1 AND parent_id IS NULL AND name = $2
+                """,
+                workspace_id,
+                name,
+            )
+        return await self._conn.fetchrow(
+            """
+            SELECT id, workspace_id, parent_id, name, path,
+                   created_at, updated_at
+            FROM folders
+            WHERE workspace_id = $1 AND parent_id = $2 AND name = $3
+            """,
+            workspace_id,
+            parent_id,
+            name,
+        )
+
     async def get_by_id(
         self, folder_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> asyncpg.Record | None:

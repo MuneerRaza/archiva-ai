@@ -56,6 +56,17 @@ async def create_folder(
     return DataResponse(data=folder)
 
 
+@router.post("/ensure", response_model=DataResponse[FolderResponse])
+async def ensure_folder(
+    workspace_id: VerifiedWorkspaceId,
+    body: FolderCreate,
+    conn: DbConn,
+) -> DataResponse[FolderResponse]:
+    service = _get_service(conn)
+    folder = await service.ensure_folder(workspace_id, body)
+    return DataResponse(data=folder)
+
+
 @router.get("/{folder_id}", response_model=DataResponse[FolderResponse])
 async def get_folder(
     workspace_id: VerifiedWorkspaceId,

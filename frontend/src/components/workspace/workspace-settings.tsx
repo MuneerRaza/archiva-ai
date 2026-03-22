@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
+  BookOpen,
   Bot,
   Check,
   CheckCircle2,
@@ -94,6 +95,7 @@ const DEFAULT_SETTINGS: WorkspaceSettingsType = {
     auto_ingest: true,
     reprocess_on_update: true,
     summary_model_id: null,
+    overview_model_id: null,
     vision_model_id: null,
     transcription_model_id: null,
     language: "auto",
@@ -629,6 +631,9 @@ function AIModelsSection({
     if (settings.ingestion.summary_model_id === id) {
       updateIngestion({ summary_model_id: null });
     }
+    if (settings.ingestion.overview_model_id === id) {
+      updateIngestion({ overview_model_id: null });
+    }
     if (settings.ingestion.vision_model_id === id) {
       updateIngestion({ vision_model_id: null });
     }
@@ -741,6 +746,17 @@ function AIModelsSection({
         selectedId={settings.ingestion.summary_model_id}
         onSelect={(id) => updateIngestion({ summary_model_id: id })}
         emptyMessage="Add an LLM model above to enable summary generation."
+      />
+
+      {/* Overview LLM */}
+      <ModelAssignment
+        title="Overview LLM"
+        description="Used for generating concise file overviews during ingestion."
+        icon={BookOpen}
+        models={llmModels}
+        selectedId={settings.ingestion.overview_model_id}
+        onSelect={(id) => updateIngestion({ overview_model_id: id })}
+        emptyMessage="Add an LLM model above to enable overview generation."
       />
 
       {/* Vision LLM */}

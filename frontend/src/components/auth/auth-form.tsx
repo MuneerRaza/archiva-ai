@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LogoIcon } from "@/components/logo";
 import { LoadingDots } from "@/components/ui/loading-dots";
@@ -19,6 +19,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   const isLogin = mode === "login";
 
@@ -38,18 +40,66 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const supabase = createClient();
 
-    const { error: authError } = isLogin
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
+    if (isLogin) {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+    } else {
+      const { data, error: authError } = await supabase.auth.signUp({ email, password });
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+      // If email confirmation is enabled, session will be null
+      if (!data.session) {
+        setConfirmationSent(true);
+        setLoading(false);
+        return;
+      }
+      router.push("/app");
+      router.refresh();
     }
+  }
 
-    router.push("/app");
-    router.refresh();
+  if (confirmationSent) {
+    return (
+      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-background px-4">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/[0.04] blur-3xl" />
+        </div>
+        <div className="relative z-10 w-full max-w-[400px] text-center">
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <LogoIcon className="h-11 w-11" />
+          </div>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Mail className="h-5 w-5 text-primary" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            Check your email
+          </h1>
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
+            We sent a confirmation link to <span className="text-foreground">{email}</span>
+          </p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Click the link in the email to activate your account.
+          </p>
+          <p className="mt-8">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground/70 transition-colors hover:text-foreground"
+            >
+              Back to sign in
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -103,17 +153,27 @@ export function AuthForm({ mode }: AuthFormProps) {
             >
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Min. 6 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              autoComplete={isLogin ? "current-password" : "new-password"}
-              className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Min. 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete={isLogin ? "current-password" : "new-password"}
+                className="flex h-11 w-full rounded-[10px] border border-[var(--overlay-8)] bg-[var(--overlay-3)] px-3.5 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all focus:border-primary/40 focus:bg-[var(--overlay-6)] focus:ring-1 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           {isLogin && (

@@ -321,6 +321,24 @@ class ProcessingPipeline:
             logger.warning("llm_provider_unavailable", file_id=str(file_id))
             return None
 
+    async def _get_overview_llm_provider(self, ingestion: IngestionSettings, file_id: uuid.UUID):
+        if not ingestion.overview_model_id:
+            logger.info("no_overview_model_configured", file_id=str(file_id))
+            return None
+
+        try:
+            ai_repo = AIModelRepository(self._conn)
+            row = await ai_repo.get_by_id(uuid.UUID(ingestion.overview_model_id))
+            if not row:
+                logger.warning("overview_model_not_found", file_id=str(file_id), model_id=ingestion.overview_model_id)
+                return None
+
+            from app.services.llm.factory import get_llm_provider_from_model
+            return get_llm_provider_from_model(row)
+        except Exception:
+            logger.warning("overview_llm_provider_unavailable", file_id=str(file_id))
+            return None
+
     async def _run_llm_summary(
         self,
         file_id: uuid.UUID,
@@ -371,7 +389,7 @@ class ProcessingPipeline:
             steps_result[ProcessingStep.OVERVIEW] = "skipped"
             return
 
-        provider = await self._get_llm_provider(ingestion, file_id)
+        provider = await self._get_overview_llm_provider(ingestion, file_id)
         if not provider:
             steps_result[ProcessingStep.OVERVIEW] = "skipped"
             return

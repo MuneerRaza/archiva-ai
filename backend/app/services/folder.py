@@ -41,6 +41,42 @@ class FolderService:
         rows = await self._repo.get_ancestors(folder_id, workspace_id)
         return [FolderResponse.from_row(r) for r in rows]
 
+    async def ensure_folder(
+        self,
+        workspace_id: uuid.UUID,
+        data: FolderCreate,
+    ) -> FolderResponse:
+        """Return existing folder or create it. Idempotent."""
+        existing = await self._repo.find_by_name_and_parent(
+            workspace_id, data.name, data.parent_id,
+        )
+        if existing is not None:
+            return FolderResponse.from_row(existing)
+
+        # Compute materialized path
+        if data.parent_id is not None:
+            parent = await self._repo.get_by_id(data.parent_id, workspace_id)
+            if parent is None:
+                raise NotFoundError("Parent folder", str(data.parent_id))
+            path = f"{parent['path']}/{data.name}"
+        else:
+            path = f"/{data.name}"
+
+        row = await self._repo.create(
+            workspace_id=workspace_id,
+            parent_id=data.parent_id,
+            name=data.name,
+            path=path,
+        )
+
+        logger.info(
+            "folder_ensured",
+            folder_id=str(row["id"]),
+            workspace_id=str(workspace_id),
+            path=path,
+        )
+        return FolderResponse.from_row(row)
+
     async def create_folder(
         self,
         workspace_id: uuid.UUID,

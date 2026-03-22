@@ -42,7 +42,7 @@ _STATUS_DESCRIPTIONS: dict[str, str] = {
 
 @dataclass
 class AgentDeps:
-    conn: asyncpg.Connection
+    pool: asyncpg.Pool
     workspace_id: uuid.UUID
     user_id: str
     remaining_context_chars: int = DEFAULT_CONTEXT_CHARS
@@ -64,8 +64,6 @@ async def browse(
         offset: Number of items to skip for pagination.
     """
     deps = ctx.deps
-    file_repo = FileRepository(deps.conn)
-    folder_repo = FolderRepository(deps.conn)
 
     folder_id = (folder_id or "").strip()
     sort_by = (sort_by or "name").strip()
@@ -84,28 +82,32 @@ async def browse(
         sort_enum = BrowseSortBy.NAME
     file_sort, sort_dir = _SORT_MAP[sort_enum]
 
-    try:
-        folders = await folder_repo.list_children(deps.workspace_id, fid)
-        files_rows, total_files = await file_repo.list_by_folder(
-            deps.workspace_id, fid,
-            sort_by=file_sort, sort_dir=sort_dir,
-            limit=limit, offset=offset,
-        )
-    except Exception as exc:
-        logger.warning("tool_browse_error", error=str(exc))
-        return f"Error browsing: {exc}"
+    async with deps.pool.acquire() as conn:
+        file_repo = FileRepository(conn)
+        folder_repo = FolderRepository(conn)
 
-    lines: list[str] = []
+        try:
+            folders = await folder_repo.list_children(deps.workspace_id, fid)
+            files_rows, total_files = await file_repo.list_by_folder(
+                deps.workspace_id, fid,
+                sort_by=file_sort, sort_dir=sort_dir,
+                limit=limit, offset=offset,
+            )
+        except Exception as exc:
+            logger.warning("tool_browse_error", error=str(exc))
+            return f"Error browsing: {exc}"
 
-    # Resolve parent folder name
-    if fid:
-        parent = await folder_repo.get_by_id(fid, deps.workspace_id)
-        if parent:
-            lines.append(f"Contents of folder: {parent['name']}")
+        lines: list[str] = []
+
+        # Resolve parent folder name
+        if fid:
+            parent = await folder_repo.get_by_id(fid, deps.workspace_id)
+            if parent:
+                lines.append(f"Contents of folder: {parent['name']}")
+            else:
+                return f"Error: Folder {folder_id} not found in this workspace."
         else:
-            return f"Error: Folder {folder_id} not found in this workspace."
-    else:
-        lines.append("Contents of home:")
+            lines.append("Contents of home:")
 
     for f in folders[:limit]:
         lines.append(f"  [folder] {f['name']}  (id: {f['id']})")
@@ -136,8 +138,6 @@ async def get_info(
         include: Comma-separated list of sections to include. Options: "summary", "structure", "metadata", "tags". Use all for full details, or pick specific sections to reduce output.
     """
     deps = ctx.deps
-    file_repo = FileRepository(deps.conn)
-    tag_repo = TagRepository(deps.conn)
 
     include = (include or "summary,structure,metadata,tags").strip()
     include_set = {s.strip().lower() for s in include.split(",") if s.strip()}
@@ -147,73 +147,77 @@ async def get_info(
     except ValueError:
         return f"Error: Invalid file_id '{file_id}'"
 
-    row = await file_repo.get_by_id(fid, deps.workspace_id)
-    if not row:
-        return f"Error: File {file_id} not found in this workspace."
+    async with deps.pool.acquire() as conn:
+        file_repo = FileRepository(conn)
+        tag_repo = TagRepository(conn)
 
-    content = await file_repo.get_content(fid)
-    tag_rows = await tag_repo.get_file_tags(fid)
-    tags = [r["name"] for r in tag_rows]
+        row = await file_repo.get_by_id(fid, deps.workspace_id)
+        if not row:
+            return f"Error: File {file_id} not found in this workspace."
 
-    status = row["status"]
+        content = await file_repo.get_content(fid)
+        tag_rows = await tag_repo.get_file_tags(fid)
+        tags = [r["name"] for r in tag_rows]
 
-    lines = [
-        f"File: {row['name']}",
-        f"ID: {row['id']}",
-        f"Type: {row['mime_type']}",
-        f"Size: {row['size_bytes'] / 1024:.0f} KB",
-    ]
+        status = row["status"]
 
-    # Only show status when it's actionable (processing or failed)
-    if status in ("processing", "failed"):
-        status_desc = _STATUS_DESCRIPTIONS[status]
-        lines.append(f"Status: {status} — {status_desc}")
+        lines = [
+            f"File: {row['name']}",
+            f"ID: {row['id']}",
+            f"Type: {row['mime_type']}",
+            f"Size: {row['size_bytes'] / 1024:.0f} KB",
+        ]
 
-    # Show per-step failures from latest processing job
-    proc_repo = ProcessingRepository(deps.conn)
-    job = await proc_repo.get_job_by_file(fid)
-    if job and job["steps"]:
-        import json as _json
-        steps = job["steps"]
-        if isinstance(steps, str):
-            steps = _json.loads(steps)
-        if isinstance(steps, dict):
-            failed_steps = [
-                (k, v.split(": ", 1)[1] if ": " in v else "unknown")
-                for k, v in steps.items()
-                if isinstance(v, str) and v.startswith("failed")
-            ]
-            if failed_steps:
-                lines.append("\nProcessing issues:")
-                for step_name, reason in failed_steps:
-                    lines.append(f"  - {step_name}: {reason}")
+        # Only show status when it's actionable (processing or failed)
+        if status in ("processing", "failed"):
+            status_desc = _STATUS_DESCRIPTIONS[status]
+            lines.append(f"Status: {status} — {status_desc}")
 
-    if row["folder_id"]:
-        lines.append(f"Folder ID: {row['folder_id']}")
+        # Show per-step failures from latest processing job
+        proc_repo = ProcessingRepository(conn)
+        job = await proc_repo.get_job_by_file(fid)
+        if job and job["steps"]:
+            import json as _json
+            steps = job["steps"]
+            if isinstance(steps, str):
+                steps = _json.loads(steps)
+            if isinstance(steps, dict):
+                failed_steps = [
+                    (k, v.split(": ", 1)[1] if ": " in v else "unknown")
+                    for k, v in steps.items()
+                    if isinstance(v, str) and v.startswith("failed")
+                ]
+                if failed_steps:
+                    lines.append("\nProcessing issues:")
+                    for step_name, reason in failed_steps:
+                        lines.append(f"  - {step_name}: {reason}")
 
-    if content:
-        if "summary" in include_set:
-            if content["summary"]:
-                lines.append(f"\nSummary:\n{content['summary']}")
-            if content["overview"]:
-                lines.append(f"\nOverview:\n{content['overview']}")
-        if "structure" in include_set and content["structure"]:
-            headings = content["structure"]
-            if isinstance(headings, list):
-                lines.append("\nStructure:")
-                for h in headings[:30]:
-                    if isinstance(h, dict):
-                        level = h.get("level", 1)
-                        text = h.get("text", "")
-                        indent = "  " * (level - 1)
-                        lines.append(f"  {indent}{text}")
-        if "metadata" in include_set:
-            if content["page_count"]:
-                lines.append(f"Pages: {content['page_count']}")
-            if content["word_count"]:
-                lines.append(f"Words: {content['word_count']}")
-            if content["language"]:
-                lines.append(f"Language: {content['language']}")
+        if row["folder_id"]:
+            lines.append(f"Folder ID: {row['folder_id']}")
+
+        if content:
+            if "summary" in include_set:
+                if content["summary"]:
+                    lines.append(f"\nSummary:\n{content['summary']}")
+                if content["overview"]:
+                    lines.append(f"\nOverview:\n{content['overview']}")
+            if "structure" in include_set and content["structure"]:
+                headings = content["structure"]
+                if isinstance(headings, list):
+                    lines.append("\nStructure:")
+                    for h in headings[:30]:
+                        if isinstance(h, dict):
+                            level = h.get("level", 1)
+                            text = h.get("text", "")
+                            indent = "  " * (level - 1)
+                            lines.append(f"  {indent}{text}")
+            if "metadata" in include_set:
+                if content["page_count"]:
+                    lines.append(f"Pages: {content['page_count']}")
+                if content["word_count"]:
+                    lines.append(f"Words: {content['word_count']}")
+                if content["language"]:
+                    lines.append(f"Language: {content['language']}")
 
     if "tags" in include_set and tags:
         lines.append(f"\nTags: {', '.join(tags)}")
@@ -238,18 +242,20 @@ async def search(
         offset: Number of results to skip for pagination.
     """
     deps = ctx.deps
-    search_repo = SearchRepository(deps.conn)
 
     limit = min(max(limit, 1), SEARCH_LIMIT)
     offset = max(offset, 0)
 
-    try:
-        rows, total = await search_repo.search(
-            deps.workspace_id, query, limit=limit, offset=offset,
-        )
-    except Exception as exc:
-        logger.warning("tool_search_error", error=str(exc))
-        return f"Error searching: {exc}"
+    async with deps.pool.acquire() as conn:
+        search_repo = SearchRepository(conn)
+
+        try:
+            rows, total = await search_repo.search(
+                deps.workspace_id, query, limit=limit, offset=offset,
+            )
+        except Exception as exc:
+            logger.warning("tool_search_error", error=str(exc))
+            return f"Error searching: {exc}"
 
     if not rows:
         return f"No results found for '{query}'."
@@ -284,7 +290,6 @@ async def read(
         match: Optional search term. When provided, returns the first passage containing this term instead of reading from the offset. Useful for jumping directly to relevant content.
     """
     deps = ctx.deps
-    file_repo = FileRepository(deps.conn)
     budget = max(deps.remaining_context_chars, MIN_CONTEXT_CHARS)
 
     try:
@@ -292,11 +297,15 @@ async def read(
     except ValueError:
         return f"Error: Invalid file_id '{file_id}'"
 
-    row = await file_repo.get_by_id(fid, deps.workspace_id)
-    if not row:
-        return f"Error: File {file_id} not found in this workspace."
+    async with deps.pool.acquire() as conn:
+        file_repo = FileRepository(conn)
 
-    content = await file_repo.get_content(fid)
+        row = await file_repo.get_by_id(fid, deps.workspace_id)
+        if not row:
+            return f"Error: File {file_id} not found in this workspace."
+
+        content = await file_repo.get_content(fid)
+
     raw_text = content["raw_text"] if content and content["raw_text"] else ""
 
     total = len(raw_text)

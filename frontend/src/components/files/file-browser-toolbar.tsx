@@ -11,6 +11,7 @@ import {
   Check,
   ChevronDown,
   FolderPlus,
+  FolderUp,
   LayoutGrid,
   List,
   RefreshCw,
@@ -39,6 +40,7 @@ interface FileBrowserToolbarProps {
   canGoBack: boolean;
   onCreateFolder: () => void;
   onUploadClick: () => void;
+  onUploadFolderClick: () => void;
   onBulkDelete: () => void;
   onBulkReprocess: () => void;
   selectionHasOnlyFiles: boolean;
@@ -70,6 +72,7 @@ export function FileBrowserToolbar({
   canGoBack,
   onCreateFolder,
   onUploadClick,
+  onUploadFolderClick,
   onBulkDelete,
   onBulkReprocess,
   selectionHasOnlyFiles,
@@ -264,6 +267,15 @@ export function FileBrowserToolbar({
             >
               <Upload className="mr-1 h-3.5 w-3.5" />
               Upload
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onUploadFolderClick}
+              className="h-7 text-[12px]"
+            >
+              <FolderUp className="mr-1 h-3.5 w-3.5" />
+              Upload folder
             </Button>
           </>
         )}

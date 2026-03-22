@@ -87,6 +87,7 @@ export interface IngestionSettings {
   auto_ingest: boolean;
   reprocess_on_update: boolean;
   summary_model_id: string | null;
+  overview_model_id: string | null;
   vision_model_id: string | null;
   transcription_model_id: string | null;
   language: string;
