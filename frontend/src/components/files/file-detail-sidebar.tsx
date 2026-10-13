@@ -14,6 +14,7 @@ import {
   Layers,
   List,
   Mic,
+  ShieldAlert,
   Tag,
   Trash2,
   Type,
@@ -22,14 +23,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileStatusBadge } from "@/components/files/file-status-badge";
+import { PIIPanel } from "@/components/files/pii-panel";
 import { TagManager } from "@/components/files/tag-manager";
 import { useClearArtifacts } from "@/lib/queries/file-detail";
+import { piiModalityForMime } from "@/lib/viewer-utils";
 import type { FileDetail } from "@/types/models";
 import type { NavigateTarget } from "@/components/files/file-detail-view";
 
 interface FileDetailSidebarProps {
   detail: FileDetail;
   downloadUrl: string;
+  piiEnabled?: boolean;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
   onNavigate?: (target: NavigateTarget) => void;
 }
 
@@ -49,9 +55,18 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function FileDetailSidebar({ detail, downloadUrl, onNavigate }: FileDetailSidebarProps) {
+export function FileDetailSidebar({
+  detail,
+  downloadUrl,
+  piiEnabled,
+  activeTab: activeTabProp,
+  onTabChange,
+  onNavigate,
+}: FileDetailSidebarProps) {
   const { file, content, tags } = detail;
-  const [activeTab, setActiveTab] = useState("info");
+  const [internalTab, setInternalTab] = useState("info");
+  const activeTab = activeTabProp ?? internalTab;
+  const setActiveTab = onTabChange ?? setInternalTab;
   const clearArtifacts = useClearArtifacts(file.workspace_id, file.id);
 
   const hasSummary = !!content?.summary;
@@ -72,6 +87,9 @@ export function FileDetailSidebar({ detail, downloadUrl, onNavigate }: FileDetai
   }
   if (hasStructure) {
     tabs.push({ value: "structure", label: "Structure", icon: <List className="h-3 w-3" /> });
+  }
+  if (piiEnabled) {
+    tabs.push({ value: "pii", label: "PII", icon: <ShieldAlert className="h-3 w-3" /> });
   }
 
   // Fall back to "info" if active tab's data was cleared
@@ -237,6 +255,16 @@ export function FileDetailSidebar({ detail, downloadUrl, onNavigate }: FileDetai
             <div className="p-4 pt-2">
               <StructureTree data={content!.structure!} onNavigate={onNavigate} />
             </div>
+          </TabsContent>
+        )}
+        {/* PII tab — detect, review, edit, redact */}
+        {piiEnabled && (
+          <TabsContent value="pii" className="min-h-0 flex-1 p-0">
+            <PIIPanel
+              workspaceId={file.workspace_id}
+              fileId={file.id}
+              modality={piiModalityForMime(file.mime_type, file.name)}
+            />
           </TabsContent>
         )}
       </Tabs>

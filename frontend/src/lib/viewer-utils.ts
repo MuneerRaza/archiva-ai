@@ -96,6 +96,26 @@ export function getViewerType(mimeType: string, fileName: string): ViewerType {
   return "fallback";
 }
 
+export type PIIModality =
+  | "text"
+  | "document"
+  | "spreadsheet"
+  | "image"
+  | "audio"
+  | "video";
+
+/** Map a file's MIME type to the PII detection modality. */
+export function piiModalityForMime(mimeType: string, fileName: string): PIIModality {
+  if (mimeType === "application/pdf") return "document";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  if (EXCEL_TYPES.has(mimeType) || mimeType === "text/csv") return "spreadsheet";
+  if (DOCUMENT_TYPES.has(mimeType)) return "document";
+  void fileName;
+  return "text";
+}
+
 /** Map file extension to shiki language ID for syntax highlighting */
 export function getLanguageFromFileName(fileName: string): string {
   const ext = fileName.includes(".")

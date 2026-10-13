@@ -101,6 +101,16 @@ export interface IngestionSettings {
   image: ImageSettings;
   audio: AudioSettings;
   video: VideoSettings;
+  pii: PIISettings;
+}
+
+export interface PIISettings {
+  enabled: boolean;
+  text_entities: string[];
+  audio_entities: string[];
+  image_classes: string[];
+  video_classes: string[];
+  custom_regex: string[];
 }
 
 export type LLMProvider = "ollama" | "vllm" | "openai" | "anthropic" | "gemini" | "groq";
@@ -176,8 +186,15 @@ export interface AIModel {
   has_api_key: boolean;
   capabilities: string[];
   context_length: number | null;
+  is_system: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** A model offered by a provider, discovered via its /models endpoint. */
+export interface AvailableModel {
+  id: string;
+  context_window: number | null;
 }
 
 export interface AIModelCreate {
@@ -225,7 +242,8 @@ export type FileStatus =
   | "processing"
   | "ready"
   | "partial"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface FileItem {
   id: string;
@@ -324,7 +342,13 @@ export interface AgentSessionDetail extends AgentSession {
 // Processing
 // ---------------------------------------------------------------------------
 
-export type ProcessingJobStatus = "queued" | "running" | "completed" | "failed";
+export type ProcessingJobStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "cancelled";
 
 export interface ProcessingJob {
   id: string;
@@ -340,4 +364,84 @@ export interface ProcessingJob {
   created_at: string;
   file_name: string | null;
   file_mime_type: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// PII detection & redaction
+// ---------------------------------------------------------------------------
+
+export type PIIModality =
+  | "text"
+  | "document"
+  | "spreadsheet"
+  | "image"
+  | "audio"
+  | "video";
+
+export type PIIRunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type PIILocationType = "char_span" | "bbox" | "time_range";
+
+export type PIIDetectionSource = "presidio" | "gliner" | "regex" | "yolo" | "manual";
+
+export type RedactMode = "in_place" | "copy";
+
+export type RedactionMethod = "mask" | "label" | "box" | "blur" | "beep" | "silence";
+
+export interface PIIDetection {
+  id: string;
+  entity_type: string;
+  value: string | null;
+  score: number;
+  source: PIIDetectionSource;
+  location_type: PIILocationType;
+  location: Record<string, number>;
+  selected: boolean;
+}
+
+export interface PIIRun {
+  id: string;
+  file_id: string;
+  workspace_id: string;
+  status: PIIRunStatus;
+  modality: PIIModality;
+  requested_classes: string[];
+  model_info: Record<string, unknown> | null;
+  detection_count: number;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  detections: PIIDetection[];
+}
+
+export interface PIIDetectRequest {
+  modality: PIIModality;
+  classes?: string[] | null;
+  custom_regex?: string[];
+}
+
+export interface PIIRedactRequest {
+  mode: RedactMode;
+  method: RedactionMethod;
+  detection_ids?: string[] | null;
+  mask_char?: string;
+}
+
+export interface PIIRedactResult {
+  redaction_count: number;
+  mode: RedactMode;
+  output_file_id: string | null;
+  output_storage_key: string | null;
+}
+
+export interface PIIDetectionCreate {
+  entity_type: string;
+  value: string;
+}
+
+export interface PIIDetectionUpdate {
+  entity_type?: string;
+  value?: string;
+  selected?: boolean;
 }

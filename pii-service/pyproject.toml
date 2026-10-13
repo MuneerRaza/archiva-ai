@@ -1,0 +1,56 @@
+[project]
+name = "archiva-pii-service"
+version = "0.1.0"
+description = "Archiva.ai — PII detection & redaction microservice (Presidio + GLiNER + YOLO, MLflow registry)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "structlog>=24.4.0",
+    "httpx>=0.28.0",
+    "presidio-analyzer>=2.2.355",
+    "presidio-anonymizer>=2.2.355",
+    "gliner>=0.2.13",
+    "ultralytics>=8.3.0",
+    "mlflow>=2.19.0",
+    "boto3>=1.36.0",
+    "spacy>=3.7.0",
+    "pymupdf>=1.24.0",
+    "pytesseract>=0.3.13",
+    "pillow>=10.0.0",
+    # CPU-only torch — avoid pulling multi-GB CUDA wheels.
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+]
+
+# Pin torch/torchvision to the CPU wheel index (no CUDA).
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "TCH", "RUF", "PIE"]
+ignore = [
+    "B008",  # function calls in argument defaults (FastAPI Depends/File/Form)
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

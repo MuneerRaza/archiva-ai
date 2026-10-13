@@ -130,9 +130,26 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
   const isFolderActive = folderPhase !== "idle" && folderPhase !== "done";
   const folderProgress = folderTotal > 0 ? Math.round((folderDone / folderTotal) * 100) : 0;
 
-  const avgProgress = activeJobs.length > 0
-    ? Math.round(activeJobs.reduce((sum, j) => sum + (j.progress ?? 0), 0) / activeJobs.length)
-    : undefined;
+  // Processing wave: the in-flight jobs plus everything that finished since
+  // the wave's oldest still-active job was queued. Gives a done / total count
+  // instead of just "how many are running right now".
+  let waveDone = 0;
+  let waveTotal = activeJobs.length;
+  if (activeJobs.length > 0 && jobs) {
+    const waveStart = Math.min(
+      ...activeJobs.map((j) => new Date(j.created_at).getTime()),
+    );
+    waveDone = jobs.filter(
+      (j) =>
+        (j.status === "completed" ||
+          j.status === "partial" ||
+          j.status === "failed") &&
+        new Date(j.created_at).getTime() >= waveStart,
+    ).length;
+    waveTotal = waveDone + activeJobs.length;
+  }
+  const waveProgress =
+    waveTotal > 0 ? Math.round((waveDone / waveTotal) * 100) : 0;
   return (
     <div
       className={cn(
@@ -174,11 +191,11 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
             <>
               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-400" />
               <span className="flex-1 text-[13px] font-medium">
-                Processing {activeJobs.length} file{activeJobs.length > 1 ? "s" : ""}
+                Processing {waveDone} / {waveTotal} file{waveTotal !== 1 ? "s" : ""}
               </span>
-              {avgProgress !== undefined && avgProgress > 0 && (
-                <span className="text-[11px] text-muted-foreground">{avgProgress}%</span>
-              )}
+              <span className="text-[11px] text-muted-foreground">
+                {waveTotal - waveDone} left
+              </span>
             </>
           )}
           {phase === "done" && !hasFailures && (
@@ -205,7 +222,7 @@ export function UploadProgress({ workspaceId }: UploadProgressProps) {
           <Progress value={folderProgress} className="mt-2 h-1" />
         ) : phase !== "done" ? (
           <Progress
-            value={phase === "processing" ? avgProgress : undefined}
+            value={phase === "processing" ? waveProgress : undefined}
             className="mt-2 h-1"
           />
         ) : null}

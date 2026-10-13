@@ -26,7 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useCreateAIModel, useUpdateAIModel, useTestAIModel } from "@/lib/queries/ai-models";
+import {
+  useAvailableModels,
+  useCreateAIModel,
+  useUpdateAIModel,
+  useTestAIModel,
+} from "@/lib/queries/ai-models";
 import type { AIModel, AIModelType, LLMProvider } from "@/types/models";
 
 const PROVIDERS: { value: LLMProvider; label: string }[] = [
@@ -65,7 +70,7 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
 
   const [label, setLabel] = useState("");
   const [modelType, setModelType] = useState<AIModelType>("llm");
-  const [provider, setProvider] = useState<LLMProvider>("ollama");
+  const [provider, setProvider] = useState<LLMProvider>("groq");
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -88,9 +93,9 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
       } else {
         setLabel("");
         setModelType("llm");
-        setProvider("ollama");
+        setProvider("groq");
         setModel("");
-        setBaseUrl(DEFAULT_BASE_URLS["ollama"] ?? "");
+        setBaseUrl(DEFAULT_BASE_URLS["groq"] ?? "");
         setApiKey("");
         setContextLength("");
         setCapabilities([]);
@@ -100,14 +105,44 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
     }
   }, [open, editModel]);
 
+  // Live Groq model list — populates the Model picker for Groq.
+  const isGroq = provider === "groq";
+  const groqModels = useAvailableModels(modelType, open && isGroq);
+
   function handleProviderChange(v: string) {
     const p = v as LLMProvider;
     setProvider(p);
     setBaseUrl(DEFAULT_BASE_URLS[p] ?? "");
     setApiKey("");
+    setModel("");
     setTestStatus("idle");
     setTestError(null);
   }
+
+  function handleGroqModelSelect(modelId: string) {
+    setModel(modelId);
+    setTestStatus("idle");
+    setTestError(null);
+    const picked = groqModels.data?.find((m) => m.id === modelId);
+    if (picked?.context_window) {
+      setContextLength(String(picked.context_window));
+    }
+    if (!label.trim()) {
+      setLabel(modelId);
+    }
+  }
+
+  function handleModelTypeChange(v: string) {
+    setModelType(v as AIModelType);
+    setModel("");
+    setTestStatus("idle");
+    setTestError(null);
+  }
+
+  // Groq model options — include the current value even if Groq dropped it.
+  const groqModelIds = groqModels.data?.map((m) => m.id) ?? [];
+  const groqModelOptions =
+    model && !groqModelIds.includes(model) ? [model, ...groqModelIds] : groqModelIds;
 
   async function handleTest() {
     setTestStatus("testing");
@@ -201,7 +236,7 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select value={modelType} onValueChange={(v) => setModelType(v as AIModelType)}>
+              <Select value={modelType} onValueChange={handleModelTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -233,11 +268,41 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
 
           <div className="space-y-2">
             <Label>Model</Label>
-            <Input
-              value={model}
-              onChange={(e) => { setModel(e.target.value); setTestStatus("idle"); }}
-              placeholder={showApiKey ? "e.g. gpt-4o, claude-sonnet-4-5" : "e.g. qwen2.5:14b"}
-            />
+            {isGroq ? (
+              <>
+                <Select
+                  value={model}
+                  onValueChange={handleGroqModelSelect}
+                  disabled={groqModels.isLoading || groqModels.isError}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        groqModels.isLoading ? "Loading Groq models…" : "Select a Groq model"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groqModelOptions.map((id) => (
+                      <SelectItem key={id} value={id}>
+                        {id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {groqModels.isError && (
+                  <p className="text-[11px] text-destructive">
+                    Couldn’t load Groq models — check the server’s Groq API key.
+                  </p>
+                )}
+              </>
+            ) : (
+              <Input
+                value={model}
+                onChange={(e) => { setModel(e.target.value); setTestStatus("idle"); }}
+                placeholder={showApiKey ? "e.g. gpt-4o, claude-sonnet-4-5" : "e.g. qwen2.5:14b"}
+              />
+            )}
           </div>
 
           {showBaseUrl && (
@@ -253,12 +318,18 @@ export function AIModelDialog({ open, onOpenChange, editModel }: AIModelDialogPr
 
           {showApiKey && (
             <div className="space-y-2">
-              <Label>API Key</Label>
+              <Label>API Key{isGroq ? " (optional)" : ""}</Label>
               <Input
                 type="password"
                 value={apiKey}
                 onChange={(e) => { setApiKey(e.target.value); setTestStatus("idle"); }}
-                placeholder={isEditing && editModel.has_api_key ? "Leave blank to keep current" : "sk-..."}
+                placeholder={
+                  isGroq
+                    ? "Leave blank to use the built-in Groq key"
+                    : isEditing && editModel.has_api_key
+                      ? "Leave blank to keep current"
+                      : "sk-..."
+                }
               />
             </div>
           )}

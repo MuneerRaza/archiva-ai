@@ -51,6 +51,50 @@ export function useReprocess(workspaceId: string) {
   });
 }
 
+function invalidateProcessing(
+  queryClient: ReturnType<typeof useQueryClient>,
+  workspaceId: string,
+): void {
+  queryClient.invalidateQueries({ queryKey: ["processing-history", workspaceId] });
+  queryClient.invalidateQueries({ queryKey: ["browse", workspaceId] });
+}
+
+export function useCancelProcessing(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileId: string) =>
+      api.post<DataResponse<{ cancelled: boolean; file_id: string }>>(
+        `/workspaces/${workspaceId}/files/${fileId}/cancel`,
+      ),
+    onSuccess: () => {
+      invalidateProcessing(queryClient, workspaceId);
+    },
+    onError: () => {
+      toast.error("Failed to stop processing");
+    },
+  });
+}
+
+export function useCancelAllProcessing(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<DataResponse<{ cancelled_count: number }>>(
+        `/workspaces/${workspaceId}/processing/cancel-all`,
+      ),
+    onSuccess: (res) => {
+      const n = res.data.cancelled_count;
+      toast.success(
+        n > 0 ? `Stopped ${n} file${n > 1 ? "s" : ""}` : "Nothing to stop",
+      );
+      invalidateProcessing(queryClient, workspaceId);
+    },
+    onError: () => {
+      toast.error("Failed to stop processing");
+    },
+  });
+}
+
 export function useProcessingHistory(workspaceId: string) {
   return useQuery({
     queryKey: ["processing-history", workspaceId],

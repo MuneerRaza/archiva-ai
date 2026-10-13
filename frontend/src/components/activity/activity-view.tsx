@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
+  Ban,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -14,6 +16,7 @@ import {
   Loader2,
   RefreshCw,
   Search,
+  Square,
   Upload,
 } from "lucide-react";
 import { useIsMutating } from "@tanstack/react-query";
@@ -22,7 +25,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ReprocessDialog } from "@/components/files/reprocess-dialog";
-import { useProcessingHistory } from "@/lib/queries/processing";
+import {
+  useCancelAllProcessing,
+  useCancelProcessing,
+  useProcessingHistory,
+} from "@/lib/queries/processing";
 import { getFileIcon } from "@/lib/file-icons";
 import { cn } from "@/lib/utils";
 import type { ProcessingJob } from "@/types/models";
@@ -31,7 +38,13 @@ interface ActivityViewProps {
   workspaceId: string;
 }
 
-type StatusFilter = "all" | "running" | "completed" | "failed";
+type StatusFilter =
+  | "all"
+  | "running"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "cancelled";
 
 interface JobContextMenuState {
   x: number;
@@ -45,6 +58,8 @@ export function ActivityView({ workspaceId }: ActivityViewProps) {
   const router = useRouter();
   const { data: jobs, isLoading, refetch, isFetching } = useProcessingHistory(workspaceId);
   const uploading = useIsMutating({ mutationKey: ["upload-file"] });
+  const cancelOne = useCancelProcessing(workspaceId);
+  const cancelAll = useCancelAllProcessing(workspaceId);
   const [reprocessTarget, setReprocessTarget] = useState<{
     id: string;
     name: string;
@@ -144,7 +159,9 @@ export function ActivityView({ workspaceId }: ActivityViewProps) {
     { value: "all", label: "All" },
     { value: "running", label: "Active" },
     { value: "completed", label: "Completed" },
+    { value: "partial", label: "Partial" },
     { value: "failed", label: "Failed" },
+    { value: "cancelled", label: "Cancelled" },
   ];
 
   return (
@@ -161,6 +178,18 @@ export function ActivityView({ workspaceId }: ActivityViewProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {activeCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[11px] text-red-400 hover:bg-red-500/10 hover:text-red-400"
+              onClick={() => cancelAll.mutate()}
+              disabled={cancelAll.isPending}
+            >
+              <Square className="h-3 w-3 fill-current" />
+              Stop all
+            </Button>
+          )}
           {jobs && (
             <span className="text-[12px] text-muted-foreground">
               {jobs.length} job{jobs.length !== 1 ? "s" : ""}
@@ -284,6 +313,20 @@ export function ActivityView({ workspaceId }: ActivityViewProps) {
                     <span className="shrink-0 text-[11px] text-muted-foreground/40">
                       {formatRelativeTime(latestJob.created_at)}
                     </span>
+
+                    {/* Stop button — active jobs only */}
+                    {isLatestActive && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 shrink-0 gap-1.5 px-2.5 text-[11px] text-red-400 hover:bg-red-500/10 hover:text-red-400"
+                        onClick={() => cancelOne.mutate(latestJob.file_id)}
+                        disabled={cancelOne.isPending}
+                      >
+                        <Square className="h-3 w-3 fill-current" />
+                        Stop
+                      </Button>
+                    )}
 
                     {/* Reprocess button */}
                     {canReprocess && (
@@ -574,8 +617,12 @@ function StatusIndicator({ status }: { status: ProcessingJob["status"] }) {
       return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />;
     case "completed":
       return <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400/70" />;
+    case "partial":
+      return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-400/80" />;
     case "failed":
       return <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive/70" />;
+    case "cancelled":
+      return <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />;
   }
 }
 

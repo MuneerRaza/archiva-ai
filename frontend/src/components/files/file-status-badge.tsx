@@ -31,6 +31,10 @@ const STATUS_CONFIG: Record<
     label: "Failed",
     className: "bg-red-500/10 text-red-400 border-red-500/20",
   },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+  },
 };
 
 interface FileStatusBadgeProps {

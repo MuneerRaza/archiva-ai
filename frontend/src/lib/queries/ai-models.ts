@@ -9,7 +9,9 @@ import type {
   AIModelCreate,
   AIModelTestRequest,
   AIModelTestResult,
+  AIModelType,
   AIModelUpdate,
+  AvailableModel,
   DataResponse,
   ListResponse,
 } from "@/types/models";
@@ -19,6 +21,23 @@ export function useAIModels() {
     queryKey: ["ai-models"],
     queryFn: () => api.get<ListResponse<AIModel>>("/ai-models"),
     select: (res) => res.data,
+  });
+}
+
+/**
+ * Models a provider currently offers (Groq only). Powers the model picker —
+ * LLMs for the agent, whisper models for transcription.
+ */
+export function useAvailableModels(modelType: AIModelType, enabled = true) {
+  return useQuery({
+    queryKey: ["available-models", "groq", modelType],
+    queryFn: () =>
+      api.get<ListResponse<AvailableModel>>(
+        `/ai-models/available?provider=groq&model_type=${modelType}`,
+      ),
+    select: (res) => res.data,
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

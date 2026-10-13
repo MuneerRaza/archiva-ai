@@ -18,15 +18,18 @@ import {
   ImageIcon,
   Info,
   Loader2,
+  Lock,
   LogOut,
   Pencil,
   Plus,
   RefreshCw,
   Settings2,
+  ShieldAlert,
   Sun,
   Trash2,
   User,
   Wifi,
+  X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,6 +49,8 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AIModelDialog } from "@/components/workspace/ai-model-dialog";
+import { MultiSelectChips } from "@/components/workspace/multi-select-chips";
+import { TEXT_ENTITY_OPTIONS, YOLO_CLASS_OPTIONS } from "@/lib/pii-catalog";
 import { CreateWorkspaceDialog } from "@/components/workspace/create-workspace-dialog";
 import { cn } from "@/lib/utils";
 import { useProfile, useUpdateProfile } from "@/lib/queries/auth";
@@ -108,6 +113,17 @@ const DEFAULT_SETTINGS: WorkspaceSettingsType = {
     image: { description: false },
     audio: { transcription: false, summary: false },
     video: { transcription: false, description: false, summary: false },
+    pii: {
+      enabled: false,
+      text_entities: [
+        "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD",
+        "US_SSN", "IBAN_CODE", "IP_ADDRESS", "LOCATION",
+      ],
+      audio_entities: ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION"],
+      image_classes: ["person"],
+      video_classes: ["person"],
+      custom_regex: [],
+    },
   },
   agent: {
     model_id: null,
@@ -136,6 +152,7 @@ function mergeSettings(partial: Record<string, unknown>): WorkspaceSettingsType 
       image: { ...DEFAULT_SETTINGS.ingestion.image, ...(ingClean.image as Record<string, unknown> ?? {}) },
       audio: { ...DEFAULT_SETTINGS.ingestion.audio, ...(ingClean.audio as Record<string, unknown> ?? {}) },
       video: { ...DEFAULT_SETTINGS.ingestion.video, ...(ingClean.video as Record<string, unknown> ?? {}) },
+      pii: { ...DEFAULT_SETTINGS.ingestion.pii, ...(ingClean.pii as Record<string, unknown> ?? {}) },
     },
     agent: { ...DEFAULT_SETTINGS.agent, ...agtClean },
   } as WorkspaceSettingsType;
@@ -686,6 +703,12 @@ function AIModelsSection({
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       {PROVIDER_LABELS[m.provider] ?? m.provider}
                     </Badge>
+                    {m.is_system && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                        <Lock className="h-2.5 w-2.5" />
+                        Default
+                      </Badge>
+                    )}
                     {m.capabilities
                       .filter((cap) => cap === "thinking" || cap === "vision")
                       .map((cap) => (
@@ -697,39 +720,47 @@ function AIModelsSection({
                   <p className="text-[12px] text-muted-foreground">{m.model}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => {
-                      setRefreshingModelId(m.id);
-                      refreshCaps.mutate(m.id, {
-                        onSettled: () => setRefreshingModelId(null),
-                      });
-                    }}
-                    disabled={refreshingModelId === m.id}
-                    title="Refresh capabilities"
-                  >
-                    <RefreshCw className={cn("h-3.5 w-3.5", refreshingModelId === m.id && "animate-spin")} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => openEditDialog(m)}
-                    title="Edit model"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(m.id)}
-                    title="Remove model"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {m.is_system ? (
+                    <span className="text-[11px] text-muted-foreground pr-1">
+                      Built-in
+                    </span>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          setRefreshingModelId(m.id);
+                          refreshCaps.mutate(m.id, {
+                            onSettled: () => setRefreshingModelId(null),
+                          });
+                        }}
+                        disabled={refreshingModelId === m.id}
+                        title="Refresh capabilities"
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5", refreshingModelId === m.id && "animate-spin")} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => openEditDialog(m)}
+                        title="Edit model"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(m.id)}
+                        title="Remove model"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -1253,6 +1284,145 @@ function IngestionSection({
             disabledHint="Configure summary model in AI Models tab"
           />
         </CategoryCard>
+      </div>
+
+      {/* PII detection */}
+      <PIISettingsCard ingestion={ingestion} updateIngestion={updateIngestion} />
+    </div>
+  );
+}
+
+function PIISettingsCard({
+  ingestion,
+  updateIngestion,
+}: {
+  ingestion: IngestionSettings;
+  updateIngestion: (patch: Partial<IngestionSettings>) => void;
+}) {
+  const pii = ingestion.pii;
+
+  function patchPII(patch: Partial<typeof pii>) {
+    updateIngestion({ pii: { ...pii, ...patch } });
+  }
+
+  return (
+    <div className="rounded-lg border border-[var(--overlay-8)] bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--overlay-6)]">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+          <span className="text-[13px] font-medium">PII Detection &amp; Redaction</span>
+        </div>
+        <Switch
+          checked={pii.enabled}
+          onCheckedChange={(v) => patchPII({ enabled: v })}
+        />
+      </div>
+      {pii.enabled && (
+        <div className="space-y-4 px-4 py-4">
+          <p className="text-[12px] text-muted-foreground">
+            When enabled, a <strong>Detect PII</strong> action appears on each file. These are
+            the default classes pre-selected in the detect dialog — you can change them per run.
+          </p>
+          <MultiSelectChips
+            label="In documents & text"
+            options={TEXT_ENTITY_OPTIONS}
+            selected={pii.text_entities}
+            onChange={(v) => patchPII({ text_entities: v })}
+          />
+          <MultiSelectChips
+            label="In audio & video speech"
+            options={TEXT_ENTITY_OPTIONS}
+            selected={pii.audio_entities}
+            onChange={(v) => patchPII({ audio_entities: v })}
+          />
+          <MultiSelectChips
+            label="In images"
+            options={YOLO_CLASS_OPTIONS}
+            selected={pii.image_classes}
+            onChange={(v) => patchPII({ image_classes: v })}
+          />
+          <MultiSelectChips
+            label="In videos"
+            options={YOLO_CLASS_OPTIONS}
+            selected={pii.video_classes}
+            onChange={(v) => patchPII({ video_classes: v })}
+          />
+          <ChipListEditor
+            label="Custom regex patterns"
+            values={pii.custom_regex}
+            onChange={(v) => patchPII({ custom_regex: v })}
+            placeholder="e.g. \\bEMP-\\d{6}\\b"
+            mono
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChipListEditor({
+  label,
+  values,
+  onChange,
+  placeholder,
+  mono,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  mono?: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function add() {
+    const v = draft.trim();
+    if (v && !values.includes(v)) onChange([...values, v]);
+    setDraft("");
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-[12px]">{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((v) => (
+          <span
+            key={v}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md bg-[var(--overlay-4)] px-2 py-0.5 text-[11px]",
+              mono && "font-mono",
+            )}
+          >
+            {v}
+            <button
+              onClick={() => onChange(values.filter((x) => x !== v))}
+              className="text-muted-foreground/60 hover:text-destructive"
+              aria-label={`Remove ${v}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        {values.length === 0 && (
+          <span className="text-[11px] text-muted-foreground/50">None</span>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          className={cn("h-8 text-[12px]", mono && "font-mono")}
+        />
+        <Button size="sm" variant="outline" className="h-8" onClick={add}>
+          Add
+        </Button>
       </div>
     </div>
   );

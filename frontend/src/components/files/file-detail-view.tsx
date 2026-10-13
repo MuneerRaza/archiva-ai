@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -22,6 +22,7 @@ import { VideoPlayer } from "@/components/files/viewers/video-player";
 
 import { useFileDetail } from "@/lib/queries/file-detail";
 import { useUpdateFile } from "@/lib/queries/files";
+import { useWorkspace } from "@/lib/queries/workspaces";
 import { getViewerType, type ViewerType } from "@/lib/viewer-utils";
 import { useUIStore } from "@/stores/ui-store";
 
@@ -60,6 +61,14 @@ export function FileDetailView({ workspaceId, fileId }: FileDetailViewProps) {
   const { detailPaneOpen, detailPaneWidth, toggleDetailPane, setDetailPaneWidth } = useUIStore();
   const [navigateTo, setNavigateTo] = useState<NavigateTarget | null>(null);
   const [reprocessOpen, setReprocessOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState("info");
+  const { data: workspace } = useWorkspace(workspaceId);
+  const piiEnabled = workspace?.settings?.ingestion?.pii?.enabled ?? false;
+
+  function openPiiTab() {
+    setDetailTab("pii");
+    if (!detailPaneOpen) toggleDetailPane();
+  }
 
   // Inline rename state
   const [isEditing, setIsEditing] = useState(false);
@@ -177,7 +186,10 @@ export function FileDetailView({ workspaceId, fileId }: FileDetailViewProps) {
 
   const { file, storage_key } = detail;
   const viewerType = getViewerType(file.mime_type, file.name);
-  const fileUrl = `${API_ROOT}/storage/local/${storage_key}`;
+  // Key the URL on updated_at so in-place redaction (same storage_key) busts the
+  // browser cache and forces the viewer to reload the redacted content.
+  const cacheBust = encodeURIComponent(file.updated_at);
+  const fileUrl = `${API_ROOT}/storage/local/${storage_key}?v=${cacheBust}`;
   const downloadUrl = fileUrl;
 
   return (
@@ -207,6 +219,20 @@ export function FileDetailView({ workspaceId, fileId }: FileDetailViewProps) {
           >
             {file.name}
           </h1>
+        )}
+
+        {piiEnabled && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 gap-1.5 px-2.5 text-[11px]"
+            onClick={openPiiTab}
+            aria-label="PII detection"
+            title="PII detection & redaction"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            PII
+          </Button>
         )}
 
         <Button
@@ -252,6 +278,9 @@ export function FileDetailView({ workspaceId, fileId }: FileDetailViewProps) {
             <FileDetailSidebar
               detail={detail}
               downloadUrl={downloadUrl}
+              piiEnabled={piiEnabled}
+              activeTab={detailTab}
+              onTabChange={setDetailTab}
               onNavigate={setNavigateTo}
             />
           </div>

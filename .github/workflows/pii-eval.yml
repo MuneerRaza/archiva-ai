@@ -1,0 +1,41 @@
+# Lint + PII detector eval gate.
+# The eval job runs the labeled PII set through the text detector and fails if
+# macro-F1 regresses below the threshold — continuous evaluation for the model.
+
+name: pii-eval
+
+on:
+  push:
+    paths:
+      - "pii-service/**"
+      - ".github/workflows/pii-eval.yml"
+  pull_request:
+    paths:
+      - "pii-service/**"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Ruff
+        working-directory: pii-service
+        run: uvx ruff check app/
+
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install deps
+        working-directory: pii-service
+        run: uv sync --no-dev
+      - name: Download spaCy model
+        working-directory: pii-service
+        run: uv run python -m spacy download en_core_web_sm
+      - name: Run PII eval (offline, no MLflow)
+        working-directory: pii-service
+        env:
+          PII_EVAL_MIN_MACRO_F1: "0.6"
+        run: uv run python -m app.eval.ci_gate

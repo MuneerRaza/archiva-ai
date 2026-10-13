@@ -1,1 +1,0 @@
-ALTER TABLE file_contents ADD COLUMN IF NOT EXISTS overview TEXT;

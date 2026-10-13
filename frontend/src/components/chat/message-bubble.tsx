@@ -15,6 +15,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import type { BundledLanguage } from "shiki";
 import { codeToHtml } from "shiki";
 
@@ -364,6 +366,9 @@ export function MessageBubble({
             <div className="max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                // rehype-raw renders inline HTML the model emits (e.g. <br>
+                // in table cells); rehype-sanitize then strips anything unsafe.
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
                 components={markdownComponents}
               >
                 {cleanContent}
